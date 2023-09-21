@@ -61,7 +61,7 @@ function run_cmd(){
   count=1
   for ip in ${deploy_iplist[@]};
   do
-     ssh -i ${key} -n -o BatchMode=yes -o StrictHostKeyChecking=no ubuntu@${ip} "$1" &
+     ssh -i ${key} -n -o BatchMode=yes -o StrictHostKeyChecking=no yathin17@${ip} "$1" &
     ((count++))
   done
 
@@ -72,7 +72,7 @@ function run_cmd(){
 }
 
 function run_one_cmd(){
-  ssh -i ${key} -n -o BatchMode=yes -o StrictHostKeyChecking=no ubuntu@${ip} "$1" 
+  ssh -i ${key} -n -o BatchMode=yes -o StrictHostKeyChecking=no yathin17@${ip} "$1" 
 }
 
 run_cmd "killall -9 ${server_bin}"
@@ -85,7 +85,7 @@ echo "upload configs"
 count=0
 for ip in ${deploy_iplist[@]};
 do
-  scp -i ${key} -r ${bin_path} ${output_path}/server.config ${output_path}/cert ubuntu@${ip}:/home/ubuntu/ &
+  scp -i ${key} -r ${bin_path} ${output_path}/server.config ${output_path}/cert yathin17@${ip}:/users/yathin17/ &
   ((count++))
 done
 
@@ -119,7 +119,7 @@ do
   resp=""
   while [ "$resp" = "" ]
   do
-    resp=`ssh -i ${key} -n -o BatchMode=yes -o StrictHostKeyChecking=no ubuntu@${ip} "grep \"receive public size:${#iplist[@]}\" ${server_bin}.log"` 
+    resp=`ssh -i ${key} -n -o BatchMode=yes -o StrictHostKeyChecking=no yathin17@${ip} "grep \"receive public size:${#iplist[@]}\" ${server_bin}.log"` 
     if [ "$resp" = "" ]; then
       sleep 1
     fi
