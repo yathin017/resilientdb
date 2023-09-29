@@ -182,26 +182,23 @@ int Commitment::ProcessProposeMsg(std::unique_ptr<Context> context,
     }
     */
 
-  // yathin017
-  LOG(INFO) << "===== Replica 5 broadcasting LEAVE request =====";
-  if (config_.GetSelfInfo().id() == 5) {
-  std::unique_ptr<SystemInfoRequest> system_info_request =
-      std::make_unique<SystemInfoRequest>();
-  system_info_request->set_type(SystemInfoRequest::REMOVE_REPLICA);
-  system_info_request->set_request("5"); // Assuming you use "5" as the replica ID to leave.
+  // yathin017 - TEST: Broadcasting leave request
+//   LOG(INFO) << "################################### Replica 5 Broadcasting LEAVE Request ###################################";
+//   if (config_.GetSelfInfo().id() == 5) {
+//   std::unique_ptr<SystemInfoRequest> system_info_request =
+//       std::make_unique<SystemInfoRequest>();
+//   system_info_request->set_type(SystemInfoRequest::REMOVE_REPLICA);
+//   system_info_request->set_request("5"); // Assuming you use "5" as the replica ID to leave.
 
-  std::string request_data;
-  system_info_request->SerializeToString(&request_data);
+//   std::string request_data;
+//   system_info_request->SerializeToString(&request_data);
 
-  std::unique_ptr<Request> leave_system_request = std::make_unique<Request>();
-  leave_system_request->set_type(Request::TYPE_SYSTEM_INFO);
-  leave_system_request->set_data(request_data);
+//   std::unique_ptr<Request> leave_system_request = std::make_unique<Request>();
+//   leave_system_request->set_type(Request::TYPE_SYSTEM_INFO);
+//   leave_system_request->set_data(request_data);
 
-  replica_communicator_->BroadCast(*leave_system_request);
-}
-
-  BatchUserRequest batch_urequest;
-  batch_urequest.ParseFromString(request->data());
+//   replica_communicator_->BroadCast(*leave_system_request);
+// }
 
   if (request->sender_id() != config_.GetSelfInfo().id()) {
     if (pre_verify_func_ && !pre_verify_func_(*request)) {
@@ -239,50 +236,40 @@ int Commitment::ProcessProposeMsg(std::unique_ptr<Context> context,
   CollectorResultCode ret =
       message_manager_->AddConsensusMsg(context->signature, std::move(request));
 
-  // yathin017
-  // LOG(INFO) << "@@@@@ Replica " << config_.GetSelfInfo().id() 
+
+  // yathin017 - TEST: Add and Remove replica
+
+  BatchUserRequest batch_request;
+  batch_request.ParseFromString(request->data());
+
+  // LOG(INFO) << "################################### Replica " << config_.GetSelfInfo().id() 
   //           << " added consensus message with batch user request seq "
-  //           << batch_urequest.seq()
-  //           << " ------> STATE: " << ret << " @@@@@";
+  //           << batch_request.seq()
+  //           << " ------> STATE: " << ret << " ###################################";
   // if (config_.GetSelfInfo().id() == 2) {
     
-  //   // TEST: Add and Remove replica
   //   std::vector<ReplicaInfo> replicas;
   //   int n;
   //   int f;
 
   //   ReplicaInfo new_replica;
-  //   int64_t rid = 5;
-  //   std::string rip = "128.110.218.52";
+  //   int64_t repID = 5;
+  //   std::string repIP = "128.110.218.52";
 
-  //   new_replica.set_id(rid);
-  //   new_replica.set_ip(rip);
+  //   new_replica.set_id(repID);
+  //   new_replica.set_ip(repIP);
 
-  //   // ADD
+  //   // ADD REPLICA
   //   message_manager_->AddReplica(new_replica);
-    
-  //   // replicas = message_manager_->GetReplicas();
-
-  //   // LOG(INFO) << "existing replicas: ";
-  //   // for (const auto& cur_replica : replicas) {
-  //   //   LOG(INFO) << "replica " << cur_replica.id();
-  //   // }
   //   n = config_.GetReplicaNum();
   //   f = n - config_.GetMinDataReceiveNum();
-  //   LOG(INFO) << "n = " << n << ", f = " << f;
-  //   // LOG(INFO);
+  //   LOG(INFO) << "n: " << n << ", f: " << f;
 
-  //   // REMOVE
-  //   message_manager_->RemoveReplica(rid);
-  //   // replicas = message_manager_->GetReplicas();
-
-  //   // LOG(INFO) << "existing replicas: ";
-  //   // for (const auto& cur_replica : replicas) {
-  //   //   LOG(INFO) << "replica " << cur_replica.id();
-  //   // }
+  //   // REMOVE REPLICA
+  //   message_manager_->RemoveReplica(repID);
   //   n = config_.GetReplicaNum();
   //   f = n - config_.GetMinDataReceiveNum();
-  //   LOG(INFO) << "n = " << n << ", f = " << f;
+  //   LOG(INFO) << "n: " << n << ", f: " << f;
   // }
 
   if (ret == CollectorResultCode::STATE_CHANGED) {
