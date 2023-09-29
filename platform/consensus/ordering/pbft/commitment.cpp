@@ -80,10 +80,11 @@ int Commitment::ProcessNewRequest(std::unique_ptr<Context> context,
   }
 
   if (config_.GetSelfInfo().id() != message_manager_->GetCurrentPrimary()) {
-    // LOG(ERROR) << "current node is not primary. primary:"
-    //            << message_manager_->GetCurrentPrimary()
-    //            << " seq:" << user_request->seq()
-    //            << " hash:" << user_request->hash();
+    // Redirect to the primary replica if not the primary.
+    LOG(INFO) << "Redirecting request to primary replica. primary:"
+              << message_manager_->GetCurrentPrimary()
+              << " seq:" << user_request->seq()
+              << " hash:" << user_request->hash();
     replica_communicator_->SendMessage(*user_request,
                                        message_manager_->GetCurrentPrimary());
     {
@@ -91,10 +92,10 @@ int Commitment::ProcessNewRequest(std::unique_ptr<Context> context,
       request_complained_.push(
           std::make_pair(std::move(context), std::move(user_request)));
     }
-
     return -3;
   }
 
+  // Check request hash and data signature.
   /*
   if(SignatureVerifier::CalculateHash(user_request->data()) !=
   user_request->hash()){ LOG(ERROR) << "the hash and data of the user request
@@ -102,7 +103,7 @@ int Commitment::ProcessNewRequest(std::unique_ptr<Context> context,
   }
   */
 
-  // check signatures
+  // Check request signatures.
   bool valid = verifier_->VerifyMessage(user_request->data(),
                                         user_request->data_signature());
   if (!valid) {
@@ -181,6 +182,31 @@ int Commitment::ProcessProposeMsg(std::unique_ptr<Context> context,
     }
     */
 
+  // yathin017
+  // LOG(INFO) << "===== Replica 4 broadcasting LEAVE request =====";
+  // if (config_.GetSelfInfo().id() == 4) {
+  //   std::unique_ptr<RemoveReplicaRequest> remove_request =
+  //       std::make_unique<RemoveReplicaRequest>();
+  //   remove_request->set_replica_id(4);
+
+  //   // std::string remove_request_bytes;
+  //   // remove_request.SerializeToString(&remove_request_bytes);
+  //   std::unique_ptr<SystemInfoRequest> system_info_request =
+  //       std::make_unique<SystemInfoRequest>();
+  //   system_info_request->set_type(SystemInfoRequest::REMOVE_REPLICA);
+  //   remove_request->SerializeToString(system_info_request->mutable_request());
+
+  //   std::unique_ptr<Request> leave_system_request = std::make_unique<Request>();
+  //   leave_system_request->set_type(Request::TYPE_SYSTEM_INFO);
+  //   system_info_request->SerializeToString(
+  //       leave_system_request->mutable_data());
+
+  //   replica_communicator_->BroadCast(*leave_system_request);
+  // }
+
+  BatchUserRequest batch_urequest;
+  batch_urequest.ParseFromString(request->data());
+
   if (request->sender_id() != config_.GetSelfInfo().id()) {
     if (pre_verify_func_ && !pre_verify_func_(*request)) {
       LOG(ERROR) << " check by the user func fail";
@@ -191,7 +217,7 @@ int Commitment::ProcessProposeMsg(std::unique_ptr<Context> context,
     batch_request.clear_createtime();
     std::string data;
     batch_request.SerializeToString(&data);
-    // check signatures
+    // Check request data signatures.
     bool valid =
         verifier_->VerifyMessage(request->data(), request->data_signature());
     if (!valid) {
@@ -216,6 +242,53 @@ int Commitment::ProcessProposeMsg(std::unique_ptr<Context> context,
   // message.
   CollectorResultCode ret =
       message_manager_->AddConsensusMsg(context->signature, std::move(request));
+
+  // yathin017
+  LOG(INFO) << "@@@@@ Replica " << config_.GetSelfInfo().id() 
+            << " added consensus message with batch user request seq "
+            << batch_urequest.seq()
+            << " ------> STATE: " << ret << " @@@@@";
+  if (config_.GetSelfInfo().id() == 2) {
+    
+    // TEST: Add and Remove replica
+    std::vector<ReplicaInfo> replicas;
+    int n;
+    int f;
+
+    ReplicaInfo new_replica;
+    int64_t rid = 5;
+    std::string rip = "128.110.218.52";
+
+    new_replica.set_id(rid);
+    new_replica.set_ip(rip);
+
+    // ADD
+    message_manager_->AddReplica(new_replica);
+    
+    // replicas = message_manager_->GetReplicas();
+
+    // LOG(INFO) << "existing replicas: ";
+    // for (const auto& cur_replica : replicas) {
+    //   LOG(INFO) << "replica " << cur_replica.id();
+    // }
+    n = config_.GetReplicaNum();
+    f = n - config_.GetMinDataReceiveNum();
+    LOG(INFO) << "n = " << n << ", f = " << f;
+    // LOG(INFO);
+
+    // REMOVE
+    message_manager_->RemoveReplica(rid);
+    // replicas = message_manager_->GetReplicas();
+
+    // LOG(INFO) << "existing replicas: ";
+    // for (const auto& cur_replica : replicas) {
+    //   LOG(INFO) << "replica " << cur_replica.id();
+    // }
+    n = config_.GetReplicaNum();
+    f = n - config_.GetMinDataReceiveNum();
+    LOG(INFO) << "n = " << n << ", f = " << f;
+  }
+
   if (ret == CollectorResultCode::STATE_CHANGED) {
     replica_communicator_->BroadCast(*prepare_request);
   }

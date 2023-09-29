@@ -34,6 +34,7 @@ namespace resdb {
 
 namespace {
 
+// Utility function to check if a replica exists in a vector of replicas
 bool ReplicaExisted(const ReplicaInfo& replica_info,
                     const std::vector<ReplicaInfo>& replicas) {
   for (auto& rep : replicas) {
@@ -46,6 +47,7 @@ bool ReplicaExisted(const ReplicaInfo& replica_info,
 
 }  // namespace
 
+// Constructor for ConsensusManager
 ConsensusManager::ConsensusManager(const ResDBConfig& config)
     : config_(config), global_stats_(Stats::GetGlobalStats()) {
   if (config_.SignatureVerifierEnabled()) {
@@ -55,25 +57,33 @@ ConsensusManager::ConsensusManager(const ResDBConfig& config)
   bc_client_ = GetReplicaClient(config_.GetReplicaInfos(), true);
 }
 
+// Destructor for ConsensusManager
 ConsensusManager::~ConsensusManager() {
   bc_client_.reset();
   Stop();
 }
 
+// Update the broadcast client with current replica information
 void ConsensusManager::UpdateBroadCastClient() {
   bc_client_ = GetReplicaClient(GetReplicas(), true);
 }
 
+// Get the broadcast client
 ReplicaCommunicator* ConsensusManager::GetBroadCastClient() {
   return bc_client_.get();
 }
 
+// Get the signature verifier
 SignatureVerifier* ConsensusManager::GetSignatureVerifier() {
   return verifier_ == nullptr ? nullptr : verifier_.get();
 }
 
-bool ConsensusManager::IsReady() const { return is_ready_; }
+// Check if the ConsensusManager is ready
+bool ConsensusManager::IsReady() const {
+  return is_ready_;
+}
 
+// Stop the ConsensusManager
 void ConsensusManager::Stop() {
   ServiceInterface::Stop();
   if (heartbeat_thread_.joinable()) {
@@ -81,6 +91,7 @@ void ConsensusManager::Stop() {
   }
 }
 
+// Start the ConsensusManager
 void ConsensusManager::Start() {
   ServiceInterface::Start();
   if (config_.HeartBeatEnabled() && verifier_) {
@@ -89,7 +100,7 @@ void ConsensusManager::Start() {
   }
 }
 
-// Keep Boardcast the public keys to others.
+// HeartBeat function to periodically broadcast public keys to other nodes
 void ConsensusManager::HeartBeat() {
   LOG(INFO) << "heart beat start";
   int sleep_time = 1;
@@ -113,7 +124,7 @@ void ConsensusManager::HeartBeat() {
       continue;
     }
 
-    // If it is not a client node, broadcost the current primary to the client.
+    // If it is not a client node, broadcast the current primary to the client.
     if (config_.GetPublicKeyCertificateInfo()
             .public_key()
             .public_key_info()
@@ -150,10 +161,7 @@ void ConsensusManager::HeartBeat() {
   }
 }
 
-// Porcess the packages received from the network.
-// context contains the client socket which can be used for sending response to
-// the client, the signature for the request will be filled inside the context
-// when parsing the message.
+// Process incoming packages from the network
 int ConsensusManager::Process(std::unique_ptr<Context> context,
                               std::unique_ptr<DataInfo> request_info) {
   global_stats_->IncClientCall();
@@ -173,7 +181,6 @@ int ConsensusManager::Process(std::unique_ptr<Context> context,
       LOG(ERROR) << " msg:" << message.data().size();
       return -2;
     }
-  } else {
   }
 
   std::unique_ptr<Request> request = std::make_unique<Request>();
@@ -187,7 +194,7 @@ int ConsensusManager::Process(std::unique_ptr<Context> context,
     return -1;
   }
 
-  // forward the signature to the request so that it can be included in the
+  // Forward the signature to the request so that it can be included in the
   // request/response set if needed.
   context->signature = message.signature();
   // LOG(ERROR) << "======= server:" << config_.GetSelfInfo().id()
@@ -196,8 +203,7 @@ int ConsensusManager::Process(std::unique_ptr<Context> context,
   return Dispatch(std::move(context), std::move(request));
 }
 
-// Dispatch the request if it is a heart beat message from other replica or a
-// cert notification from clients. Otherwise, forward to the worker.
+// Dispatch the request based on its type
 int ConsensusManager::Dispatch(std::unique_ptr<Context> context,
                                std::unique_ptr<Request> request) {
   if (request->type() == Request::TYPE_HEART_BEAT) {
@@ -206,6 +212,7 @@ int ConsensusManager::Dispatch(std::unique_ptr<Context> context,
   return ConsensusCommit(std::move(context), std::move(request));
 }
 
+// Process HeartBeat messages
 int ConsensusManager::ProcessHeartBeat(std::unique_ptr<Context> context,
                                        std::unique_ptr<Request> request) {
   std::vector<ReplicaInfo> replicas = GetReplicas();
@@ -276,15 +283,18 @@ int ConsensusManager::ProcessHeartBeat(std::unique_ptr<Context> context,
   return 0;
 }
 
+// Placeholder for processing consensus commit messages
 int ConsensusManager::ConsensusCommit(std::unique_ptr<Context> context,
                                       std::unique_ptr<Request> request) {
   return -1;
 }
 
+// Get client replicas
 std::vector<ReplicaInfo> ConsensusManager::GetClientReplicas() {
   return clients_;
 }
 
+// Get all replicas
 std::vector<ReplicaInfo> ConsensusManager::GetAllReplicas() {
   auto config_data = config_.GetConfigData();
   std::vector<ReplicaInfo> ret;
@@ -296,6 +306,7 @@ std::vector<ReplicaInfo> ConsensusManager::GetAllReplicas() {
   return ret;
 }
 
+// Broadcast a request to all replicas
 void ConsensusManager::BroadCast(const Request& request) {
   int ret = bc_client_->SendMessage(request);
   if (ret < 0) {
@@ -303,6 +314,7 @@ void ConsensusManager::BroadCast(const Request& request) {
   }
 }
 
+// Send a message to a specific node
 void ConsensusManager::SendMessage(const google::protobuf::Message& message,
                                    int64_t node_id) {
   std::vector<ReplicaInfo> replicas = GetReplicas();
@@ -324,6 +336,7 @@ void ConsensusManager::SendMessage(const google::protobuf::Message& message,
   }
 }
 
+// Create a replica client with specified replicas and options
 std::unique_ptr<ReplicaCommunicator> ConsensusManager::GetReplicaClient(
     const std::vector<ReplicaInfo>& replicas, bool is_use_long_conn) {
   return std::make_unique<ReplicaCommunicator>(
@@ -334,17 +347,26 @@ std::unique_ptr<ReplicaCommunicator> ConsensusManager::GetReplicaClient(
       is_use_long_conn, config_.GetOutputWorkerNum(), config_.GetTcpBatchNum());
 }
 
+// Placeholder for adding a new replica
 void ConsensusManager::AddNewReplica(const ReplicaInfo& info) {}
 
+// Add a new client replica
 void ConsensusManager::AddNewClient(const ReplicaInfo& info) {
   clients_.push_back(info);
   bc_client_->UpdateClientReplicas(clients_);
 }
 
+// Set the primary replica
 void ConsensusManager::SetPrimary(uint32_t primary, uint64_t version) {}
 
-uint32_t ConsensusManager::GetPrimary() { return 1; }
+// Get the primary replica
+uint32_t ConsensusManager::GetPrimary() {
+  return 1; // Placeholder for the actual implementation
+}
 
-uint32_t ConsensusManager::GetVersion() { return 1; }
+// Get the version
+uint32_t ConsensusManager::GetVersion() {
+  return 1; // Placeholder for the actual implementation
+}
 
 }  // namespace resdb

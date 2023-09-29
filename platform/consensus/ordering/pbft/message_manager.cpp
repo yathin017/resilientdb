@@ -31,6 +31,7 @@
 
 namespace resdb {
 
+// Constructor for MessageManager
 MessageManager::MessageManager(
     const ResDBConfig& config,
     std::unique_ptr<TransactionManager> transaction_manager,
@@ -69,57 +70,71 @@ MessageManager::MessageManager(
   checkpoint_manager_->SetExecutor(transaction_executor_.get());
 }
 
+// Destructor for MessageManager
 MessageManager::~MessageManager() {
   if (transaction_executor_) {
     transaction_executor_->Stop();
   }
 }
 
+// Get the next response message from the queue
 std::unique_ptr<BatchUserResponse> MessageManager::GetResponseMsg() {
   return queue_.Pop();
 }
 
+// Get the current primary replica
 int64_t MessageManager::GetCurrentPrimary() const {
   return system_info_->GetPrimaryId();
 }
 
-uint64_t MessageManager ::GetCurrentView() const {
+// Get the current view
+uint64_t MessageManager::GetCurrentView() const {
   return system_info_->GetCurrentView();
 }
 
+// Set the next sequence number
 void MessageManager::SetNextSeq(uint64_t seq) {
   next_seq_ = seq;
   LOG(ERROR) << "set next seq:" << next_seq_;
 }
 
-int64_t MessageManager::GetNextSeq() { return next_seq_; }
+// Get the next sequence number
+int64_t MessageManager::GetNextSeq() {
+  return next_seq_;
+}
 
+// Assign the next available sequence number
 absl::StatusOr<uint64_t> MessageManager::AssignNextSeq() {
   std::unique_lock<std::mutex> lk(seq_mutex_);
   uint32_t max_executed_seq = transaction_executor_->GetMaxPendingExecutedSeq();
   global_stats_->SeqGap(next_seq_ - max_executed_seq);
   if (next_seq_ - max_executed_seq >
       static_cast<uint64_t>(config_.GetMaxProcessTxn())) {
-    // LOG(ERROR) << "next_seq_: " << next_seq_ << " max_executed_seq: " <<
-    // max_executed_seq;
     return absl::InvalidArgumentError("Seq has been used up.");
   }
   return next_seq_++;
 }
 
+// Get a list of replicas
 std::vector<ReplicaInfo> MessageManager::GetReplicas() {
   return system_info_->GetReplicas();
 }
 
-// Check if the request is valid.
-// 1. view is the same as the current view
-// 2. seq is larger or equal than the next execute seq.
-// 3. inside the water mark.
+// yathin017 - MessageManager::AddReplica and MessageManager::RemoveReplica
+void MessageManager::AddReplica(const ReplicaInfo& replica) {
+  return system_info_->AddReplica(replica);
+}
+void MessageManager::RemoveReplica(int64_t replica_id) {
+  return system_info_->RemoveReplica(replica_id);
+};
+
+// Check if the request is valid
 bool MessageManager::IsValidMsg(const Request& request) {
   if (request.type() == Request::TYPE_RESPONSE) {
     return true;
   }
-  // view should be the same as the current one.
+
+  // The view should be the same as the current one.
   if (static_cast<uint64_t>(request.current_view()) != GetCurrentView()) {
     LOG(ERROR) << "message view :[" << request.current_view()
                << "] is older than the cur view :[" << GetCurrentView() << "]";
@@ -134,6 +149,7 @@ bool MessageManager::IsValidMsg(const Request& request) {
   return true;
 }
 
+// Check if consensus status should change
 bool MessageManager::MayConsensusChangeStatus(
     int type, int received_count, std::atomic<TransactionStatue>* status,
     bool ret) {
@@ -169,12 +185,7 @@ bool MessageManager::MayConsensusChangeStatus(
   return ret;
 }
 
-// Add commit messages and return the number of messages have been received.
-// The commit messages only include post(pre-prepare), prepare and commit
-// messages. Messages are handled by state (PREPARE,COMMIT,READY_EXECUTE).
-
-// If there are enough messages and the state is changed after adding the
-// message, return 1, otherwise return 0. Return -2 if the request is not valid.
+// Add consensus messages and return the number of messages received.
 CollectorResultCode MessageManager::AddConsensusMsg(
     const SignatureInfo& signature, std::unique_ptr<Request> request) {
   if (request == nullptr || !IsValidMsg(*request)) {
@@ -205,6 +216,7 @@ CollectorResultCode MessageManager::AddConsensusMsg(
   return CollectorResultCode::OK;
 }
 
+// Get a set of requests in a specified range
 RequestSet MessageManager::GetRequestSet(uint64_t min_seq, uint64_t max_seq) {
   RequestSet ret;
   std::unique_lock<std::mutex> lk(data_mutex_);
@@ -225,17 +237,22 @@ RequestSet MessageManager::GetRequestSet(uint64_t min_seq, uint64_t max_seq) {
   return ret;
 }
 
-// Get the transactions that have been execuited.
-Request* MessageManager::GetRequest(uint64_t seq) { return txn_db_->Get(seq); }
+// Get a request by sequence number
+Request* MessageManager::GetRequest(uint64_t seq) {
+  return txn_db_->Get(seq);
+}
 
+// Get prepared proofs for a specific sequence
 std::vector<RequestInfo> MessageManager::GetPreparedProof(uint64_t seq) {
   return collector_pool_->GetCollector(seq)->GetPreparedProof();
 }
 
+// Get the state of a transaction by sequence number
 TransactionStatue MessageManager::GetTransactionState(uint64_t seq) {
   return collector_pool_->GetCollector(seq)->GetStatus();
 }
 
+// Get replica state information
 int MessageManager::GetReplicaState(ReplicaState* state) {
   state->set_view(GetCurrentView());
   *state->mutable_replica_info() = config_.GetSelfInfo();
@@ -243,16 +260,19 @@ int MessageManager::GetReplicaState(ReplicaState* state) {
   return 0;
 }
 
+// Get the storage object
 Storage* MessageManager::GetStorage() {
   return transaction_executor_->GetStorage();
 }
 
+// Set the last committed time for a proxy
 void MessageManager::SetLastCommittedTime(uint64_t proxy_id) {
   lct_lock_.lock();
   last_committed_time_[proxy_id] = GetCurrentTime();
   lct_lock_.unlock();
 }
 
+// Get the last committed time for a proxy
 uint64_t MessageManager::GetLastCommittedTime(uint64_t proxy_id) {
   lct_lock_.lock();
   auto value = last_committed_time_[proxy_id];
@@ -260,27 +280,32 @@ uint64_t MessageManager::GetLastCommittedTime(uint64_t proxy_id) {
   return value;
 }
 
-bool MessageManager::IsPreapared(uint64_t seq) {
+// Check if a sequence number is prepared
+// @y017 IsPreapared -> IsPrepared
+bool MessageManager::IsPrepared(uint64_t seq) {
   return collector_pool_->GetCollector(seq)->IsPrepared();
 }
 
+// Get the highest prepared sequence number
 uint64_t MessageManager::GetHighestPreparedSeq() {
   return checkpoint_manager_->GetHighestPreparedSeq();
 }
 
+// Set the highest prepared sequence number
 void MessageManager::SetHighestPreparedSeq(uint64_t seq) {
   return checkpoint_manager_->SetHighestPreparedSeq(seq);
 }
 
+// Set the duplicate manager for transaction execution
 void MessageManager::SetDuplicateManager(DuplicateManager* manager) {
   transaction_executor_->SetDuplicateManager(manager);
 }
 
+// Send a response message
 void MessageManager::SendResponse(std::unique_ptr<Request> request) {
   std::unique_ptr<BatchUserResponse> response =
       std::make_unique<BatchUserResponse>();
   response->set_createtime(GetCurrentTime());
-  // response->set_local_id(batch_request.local_id());
   response->set_hash(request->hash());
   response->set_proxy_id(request->proxy_id());
   response->set_seq(request->seq());
@@ -291,8 +316,10 @@ void MessageManager::SendResponse(std::unique_ptr<Request> request) {
   }
 }
 
+// Get the collector pool
 LockFreeCollectorPool* MessageManager::GetCollectorPool() {
   return collector_pool_.get();
 }
 
 }  // namespace resdb
+

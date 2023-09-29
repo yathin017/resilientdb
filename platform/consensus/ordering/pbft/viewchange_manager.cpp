@@ -33,12 +33,15 @@
 
 namespace resdb {
 
+// Constructor for ComplainingClients with default timeout
 ComplaningClients::ComplaningClients()
     : proxy_id(0), is_complaining(false), timeout_length_(10000000) {}
 
+// Constructor for ComplainingClients with a specified proxy_id and default timeout
 ComplaningClients::ComplaningClients(uint64_t proxy_id)
     : proxy_id(proxy_id), is_complaining(false), timeout_length_(10000000) {}
 
+// Set the client to a complaining state and return a ViewChangeTimeout object
 std::shared_ptr<ViewChangeTimeout> ComplaningClients::SetComplaining(
     std::string hash, uint64_t view) {
   this->complain_state_lock.lock();
@@ -51,6 +54,7 @@ std::shared_ptr<ViewChangeTimeout> ComplaningClients::SetComplaining(
   return info;
 }
 
+// Count the number of ViewChangeTimeout objects with the specified hash
 uint ComplaningClients::CountViewChangeTimeout(std::string hash) {
   this->complain_state_lock.lock();
   uint value = this->viewchange_timeout_set.count(hash);
@@ -58,18 +62,21 @@ uint ComplaningClients::CountViewChangeTimeout(std::string hash) {
   return value;
 }
 
+// Erase a ViewChangeTimeout object with the specified hash
 void ComplaningClients::EraseViewChangeTimeout(std::string hash) {
   this->complain_state_lock.lock();
   this->viewchange_timeout_set.erase(hash);
   this->complain_state_lock.unlock();
 }
 
+// Release a client from the complaining state for a specific hash
 void ComplaningClients::ReleaseComplaining(std::string hash) {
   this->complain_state_lock.lock();
   this->viewchange_timeout_set.erase(hash);
   this->complain_state_lock.unlock();
 }
 
+// Constructor for ViewChangeManager
 // A manager to address View change process.
 // All stuff here will be addressed in sequential by using mutex
 // to make things simplier.
@@ -99,6 +106,7 @@ ViewChangeManager::ViewChangeManager(const ResDBConfig& config,
   }
 }
 
+// Destructor for ViewChangeManager
 ViewChangeManager::~ViewChangeManager() {
   checkpoint_manager_->Stop();
   if (server_checking_timeout_thread_.joinable()) {
@@ -109,6 +117,7 @@ ViewChangeManager::~ViewChangeManager() {
   }
 }
 
+// Initialize the ViewChangeManager
 void ViewChangeManager::MayStart() {
   if (started_) {
     return;
@@ -150,6 +159,7 @@ void ViewChangeManager::MayStart() {
   });
 }
 
+// Change the view change status and check if it matches the provided status
 bool ViewChangeManager::ChangeStatue(ViewChangeStatus status) {
   if (status == ViewChangeStatus::READY_VIEW_CHANGE) {
     if (status_ != ViewChangeStatus::READY_VIEW_CHANGE) {
@@ -161,10 +171,12 @@ bool ViewChangeManager::ChangeStatue(ViewChangeStatus status) {
   return status_ == status;
 }
 
+// Check if the system is in the middle of a view change
 bool ViewChangeManager::IsInViewChange() {
   return status_ != ViewChangeStatus::NONE;
 }
 
+// Validate a ViewChangeMessage
 bool ViewChangeManager::IsValidViewChangeMsg(
     const ViewChangeMessage& view_change_message) {
   if (view_change_message.view_number() <= system_info_->GetCurrentView()) {
@@ -208,6 +220,7 @@ bool ViewChangeManager::IsValidViewChangeMsg(
   return true;
 }
 
+// Add a ViewChangeMessage to the list of received messages
 uint32_t ViewChangeManager::AddRequest(
     const ViewChangeMessage& viewchange_message, uint32_t sender) {
   std::lock_guard<std::mutex> lk(vc_mutex_);
@@ -216,6 +229,7 @@ uint32_t ViewChangeManager::AddRequest(
   return viewchange_request_[viewchange_message.view_number()].size();
 }
 
+// Check if the next primary in the given view number is the current replica
 bool ViewChangeManager::IsNextPrimary(uint64_t view_number) {
   std::lock_guard<std::mutex> lk(mutex_);
   const std::vector<ReplicaInfo>& replicas = config_.GetReplicaInfos();
@@ -223,6 +237,7 @@ bool ViewChangeManager::IsNextPrimary(uint64_t view_number) {
          config_.GetSelfInfo().id();
 }
 
+// Set the current view number and new primary replica
 void ViewChangeManager::SetCurrentViewAndNewPrimary(uint64_t view_number) {
   system_info_->SetCurrentView(view_number);
 
@@ -232,6 +247,7 @@ void ViewChangeManager::SetCurrentViewAndNewPrimary(uint64_t view_number) {
   system_info_->SetPrimary(id);
 }
 
+// Retrieve the prepare messages for a new view
 std::vector<std::unique_ptr<Request>> ViewChangeManager::GetPrepareMsg(
     const NewViewMessage& new_view_message, bool need_sign) {
   std::map<uint64_t, Request> prepared_msg;  // <sequence, digest>
@@ -288,6 +304,7 @@ std::vector<std::unique_ptr<Request>> ViewChangeManager::GetPrepareMsg(
   return redo_request;
 }
 
+// Process a received NewViewMessage
 int ViewChangeManager::ProcessNewView(std::unique_ptr<Context> context,
                                       std::unique_ptr<Request> request) {
   NewViewMessage new_view_message;
@@ -378,6 +395,7 @@ int ViewChangeManager::ProcessNewView(std::unique_ptr<Context> context,
   return config_.GetSelfInfo().id() == system_info_->GetPrimaryId() ? -4 : 0;
 }
 
+// Process a received ViewChangeMessage
 int ViewChangeManager::ProcessViewChange(std::unique_ptr<Context> context,
                                          std::unique_ptr<Request> request) {
   ViewChangeMessage viewchange_message;
@@ -417,6 +435,7 @@ int ViewChangeManager::ProcessViewChange(std::unique_ptr<Context> context,
   return 0;
 }
 
+// Send a NewViewMessage to all replicas
 void ViewChangeManager::SendNewViewMsg(uint64_t view_number) {
   if (new_view_is_sent_) {
     return;
@@ -461,6 +480,7 @@ void ViewChangeManager::SendNewViewMsg(uint64_t view_number) {
   replica_communicator_->BroadCast(*request);
 }
 
+// Send a ViewChangeMessage to all replicas
 void ViewChangeManager::SendViewChangeMsg() {
   // PBFT Paper - <VIEW-CHANGE, v + x, n, C, P)
   ViewChangeMessage view_change_message;
@@ -509,6 +529,7 @@ void ViewChangeManager::SendViewChangeMsg() {
   replica_communicator_->BroadCast(*request);
 }
 
+// Add a timer for a complaining client
 void ViewChangeManager::AddComplaintTimer(uint64_t proxy_id, std::string hash) {
   std::lock_guard<std::mutex> lk(vc_mutex_);
   if (complaining_clients_.count(proxy_id) == 0) {
@@ -525,6 +546,7 @@ void ViewChangeManager::AddComplaintTimer(uint64_t proxy_id, std::string hash) {
   }
 }
 
+// Monitor the timeouts for various ViewChangeTimerTypes
 void ViewChangeManager::MonitoringViewChangeTimeOut() {
   while (!stop_) {
     // [DK3] After timer is out, the client will check if the corresponding
@@ -597,6 +619,7 @@ void ViewChangeManager::MonitoringViewChangeTimeOut() {
   }
 }
 
+// Monitor the checkpoint state for committable sequences
 void ViewChangeManager::MonitoringCheckpointState() {
   uint64_t last_seq_value = 0;
   while (!stop_) {
@@ -611,6 +634,7 @@ void ViewChangeManager::MonitoringCheckpointState() {
   }
 }
 
+// Set the DuplicateManager for handling duplicate requests
 void ViewChangeManager::SetDuplicateManager(DuplicateManager* manager) {
   duplicate_manager_ = manager;
 }

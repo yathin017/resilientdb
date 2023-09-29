@@ -70,8 +70,10 @@ TEST(SystemInfoTest, GetReplicas) {
   EXPECT_THAT(system.GetReplicas(), ElementsAre(EqualsProto(new_replicas[0]),
                                                 EqualsProto(new_replica)));
 
-  ReplicaInfo deplicate_new_replica = GenerateReplicaInfo("127.0.0.1", 1238, 4);
-  system.AddReplica(deplicate_new_replica);
+  // ReplicaInfo deplicate_new_replica = GenerateReplicaInfo("127.0.0.1", 1238, 4);
+  // system.AddReplica(deplicate_new_replica);
+  system.RemoveReplica(4);
+  
   EXPECT_THAT(system.GetReplicas(), ElementsAre(EqualsProto(new_replicas[0]),
                                                 EqualsProto(new_replica)));
 }

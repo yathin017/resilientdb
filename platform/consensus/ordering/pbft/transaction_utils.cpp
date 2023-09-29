@@ -27,6 +27,7 @@
 
 namespace resdb {
 
+// Create a new Request with the specified type and sender_id
 std::unique_ptr<Request> NewRequest(Request::Type type, const Request& request,
                                     int sender_id) {
   auto new_request = std::make_unique<Request>(request);
@@ -35,6 +36,7 @@ std::unique_ptr<Request> NewRequest(Request::Type type, const Request& request,
   return new_request;
 }
 
+// Create a new Request with the specified type, sender_id, and region_id
 std::unique_ptr<Request> NewRequest(Request::Type type, const Request& request,
                                     int sender_id, int region_id) {
   auto new_request = std::make_unique<Request>(request);

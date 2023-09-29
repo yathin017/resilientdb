@@ -51,18 +51,54 @@ void SystemInfo::SetReplicas(const std::vector<ReplicaInfo>& replicas) {
   replicas_ = replicas;
 }
 
+// yathin017
 void SystemInfo::AddReplica(const ReplicaInfo& replica) {
-  if (replica.id() == 0 || replica.ip().empty() || replica.port() == 0) {
-    return;
+  LOG(INFO) << "#### ADD REPLICA ####";
+  LOG(INFO) << "Existing replicas:\n";
+  for (const auto& cur_replica : replicas_) {
+    LOG(INFO) << "Replica ID:" << cur_replica.id() << " IP: " << cur_replica.ip();
   }
+
+  // if (replica.id() == 0 || replica.ip().empty() || replica.port() == 0) {
+  //   return;
+  // }
+
   for (const auto& cur_replica : replicas_) {
     if (cur_replica.id() == replica.id()) {
-      LOG(ERROR) << " replica exist:" << replica.id();
+      LOG(ERROR) << "Replica with id:" << replica.id() << " already exist.";
       return;
     }
   }
-  LOG(ERROR) << "add new replica:" << replica.DebugString();
+  LOG(ERROR) << "Adding new replica \n" << replica.DebugString();
   replicas_.push_back(replica);
+
+  LOG(INFO) << "Existing replicas:\n";
+  for (const auto& cur_replica : replicas_) {
+    LOG(INFO) << "Replica ID:" << cur_replica.id() << " IP: " << cur_replica.ip();
+  }
+}
+
+void SystemInfo::RemoveReplica(int64_t replica_id) {
+  LOG(INFO) << "#### REMOVE REPLICA ####";
+  LOG(INFO) << "Existing replicas:\n";
+  for (const auto& cur_replica : replicas_) {
+    LOG(INFO) << "Replica ID:" << cur_replica.id() << " IP: " << cur_replica.ip();
+  }
+
+  auto it = std::remove_if(replicas_.begin(), replicas_.end(),
+      [replica_id](const ReplicaInfo& replica) { return replica.id() == replica_id; });
+
+  if (it != replicas_.end()) {
+    replicas_.erase(it, replicas_.end());
+    LOG(ERROR) << "Removed replica with ID: " << replica_id;
+  } else {
+    LOG(ERROR) << "Replica with ID " << replica_id << " not found.";
+  }
+
+  LOG(INFO) << "Existing replicas:\n";
+  for (const auto& cur_replica : replicas_) {
+    LOG(INFO) << "Replica ID:" << cur_replica.id() << " IP: " << cur_replica.ip();
+  }
 }
 
 void SystemInfo::ProcessRequest(const SystemInfoRequest& request) {
@@ -71,6 +107,12 @@ void SystemInfo::ProcessRequest(const SystemInfoRequest& request) {
       NewReplicaRequest info;
       if (info.ParseFromString(request.request())) {
         AddReplica(info.replica_info());
+      }
+    } break;
+    case SystemInfoRequest::REMOVE_REPLICA: {
+      RemoveReplicaRequest removeInfo;
+      if (removeInfo.ParseFromString(request.request())) {
+        RemoveReplica(removeInfo.replica_info());
       }
     } break;
     default:

@@ -32,6 +32,7 @@
 
 namespace resdb {
 
+// Constructor for ConsensusManagerPBFT
 ConsensusManagerPBFT::ConsensusManagerPBFT(
     const ResDBConfig& config, std::unique_ptr<TransactionManager> executor,
     std::unique_ptr<CustomQuery> query_executor)
@@ -69,6 +70,7 @@ ConsensusManagerPBFT::ConsensusManagerPBFT(
 
   view_change_manager_->SetDuplicateManager(commitment_->GetDuplicateManager());
 
+  // Initialize the system info with data from log files if available.
   recovery_->ReadLogs(
       [&](const SystemInfoData& data) {
         system_info_->SetCurrentView(data.view());
@@ -79,37 +81,50 @@ ConsensusManagerPBFT::ConsensusManagerPBFT(
       });
 }
 
+// Set the need for commit QC (Quality of Commit) based on input.
 void ConsensusManagerPBFT::SetNeedCommitQC(bool need_qc) {
   commitment_->SetNeedCommitQC(need_qc);
 }
 
-void ConsensusManagerPBFT::Start() { ConsensusManager::Start(); }
+// Start the consensus manager.
+void ConsensusManagerPBFT::Start() {
+  LOG(INFO) << "ConsensusManagerPBFT is starting.";
+  ConsensusManager::Start();
+}
 
+// Get a list of replicas.
 std::vector<ReplicaInfo> ConsensusManagerPBFT::GetReplicas() {
   return message_manager_->GetReplicas();
 }
 
+// Get the primary replica.
 uint32_t ConsensusManagerPBFT::GetPrimary() {
   return system_info_->GetPrimaryId();
 }
 
+// Get the current version or view.
 uint32_t ConsensusManagerPBFT::GetVersion() {
   return system_info_->GetCurrentView();
 }
 
+// Set the primary replica and version.
 void ConsensusManagerPBFT::SetPrimary(uint32_t primary, uint64_t version) {
   if (version > system_info_->GetCurrentView()) {
     system_info_->SetCurrentView(version);
     system_info_->SetPrimary(primary);
+    LOG(INFO) << "Set primary to Replica ID: " << primary
+              << ", View: " << version;
   }
 }
 
+// Add a pending request to the queue.
 void ConsensusManagerPBFT::AddPendingRequest(std::unique_ptr<Context> context,
                                              std::unique_ptr<Request> request) {
   std::lock_guard<std::mutex> lk(mutex_);
   request_pending_.push(std::make_pair(std::move(context), std::move(request)));
 }
 
+// Add a complained request to the queue.
 void ConsensusManagerPBFT::AddComplainedRequest(
     std::unique_ptr<Context> context, std::unique_ptr<Request> request) {
   std::lock_guard<std::mutex> lk(mutex_);
@@ -117,11 +132,12 @@ void ConsensusManagerPBFT::AddComplainedRequest(
       std::make_pair(std::move(context), std::move(request)));
 }
 
+// Pop a pending request from the queue.
 absl::StatusOr<std::pair<std::unique_ptr<Context>, std::unique_ptr<Request>>>
 ConsensusManagerPBFT::PopPendingRequest() {
   std::lock_guard<std::mutex> lk(mutex_);
   if (request_pending_.empty()) {
-    // LOG(ERROR) << "empty:";
+    LOG(ERROR) << "PopPendingRequest: No pending requests available.";
     return absl::InternalError("No Data.");
   }
   auto new_request = std::move(request_pending_.front());
@@ -129,11 +145,12 @@ ConsensusManagerPBFT::PopPendingRequest() {
   return new_request;
 }
 
+// Pop a complained request from the queue.
 absl::StatusOr<std::pair<std::unique_ptr<Context>, std::unique_ptr<Request>>>
 ConsensusManagerPBFT::PopComplainedRequest() {
   std::lock_guard<std::mutex> lk(mutex_);
   if (request_complained_.empty()) {
-    // LOG(ERROR) << "empty:";
+    LOG(ERROR) << "PopComplainedRequest: No complained requests available.";
     return absl::InternalError("No Data.");
   }
   auto new_request = std::move(request_complained_.front());
@@ -141,15 +158,12 @@ ConsensusManagerPBFT::PopComplainedRequest() {
   return new_request;
 }
 
-// The implementation of PBFT.
+// The implementation of PBFT consensus.
 int ConsensusManagerPBFT::ConsensusCommit(std::unique_ptr<Context> context,
                                           std::unique_ptr<Request> request) {
-  // LOG(INFO) << "recv impl type:" << request->type() << " "
-  //          << "sender id:" << request->sender_id();
-  // If it is in viewchange, push the request to the queue
-  // for the requests from the new view which come before
-  // the local new view done.
   recovery_->AddRequest(context.get(), request.get());
+
+  // If view change is enabled, handle requests accordingly.
   if (config_.GetConfigData().enable_viewchange()) {
     view_change_manager_->MayStart();
     if (view_change_manager_->IsInViewChange()) {
@@ -167,12 +181,16 @@ int ConsensusManagerPBFT::ConsensusCommit(std::unique_ptr<Context> context,
         if (!new_request.ok()) {
           break;
         }
-        InternalConsensusCommit(std::move((*new_request).first),
-                                std::move((*new_request).second));
+        int ret = InternalConsensusCommit(std::move((*new_request).first),
+                                          std::move((*new_request).second));
+        LOG(INFO) << "Handling pending request of type: "
+                  << (*new_request).second->type() << ", Result: " << ret;
       }
     }
   }
+
   int ret = InternalConsensusCommit(std::move(context), std::move(request));
+
   if (config_.GetConfigData().enable_viewchange()) {
     if (ret == -4) {
       while (true) {
@@ -180,20 +198,20 @@ int ConsensusManagerPBFT::ConsensusCommit(std::unique_ptr<Context> context,
         if (!new_request.ok()) {
           break;
         }
-        // LOG(ERROR) << "[POP COMPLAINED REQUEST]";
-        InternalConsensusCommit(std::move((*new_request).first),
-                                std::move((*new_request).second));
+        int ret = InternalConsensusCommit(std::move((*new_request).first),
+                                          std::move((*new_request).second));
+        LOG(INFO) << "Handling complained request of type: "
+                  << (*new_request).second->type() << ", Result: " << ret;
       }
     }
   }
+
   return ret;
 }
 
+// Internal implementation of PBFT consensus commit.
 int ConsensusManagerPBFT::InternalConsensusCommit(
     std::unique_ptr<Context> context, std::unique_ptr<Request> request) {
-  // LOG(INFO) << "recv impl type:" << request->type() << " "
-  //         << "sender id:" << request->sender_id()<<" seq:"<<request->seq();
-
   switch (request->type()) {
     case Request::TYPE_CLIENT_REQUEST:
       if (config_.IsPerformanceRunning()) {
@@ -258,11 +276,13 @@ int ConsensusManagerPBFT::InternalConsensusCommit(
   return 0;
 }
 
+// Set a function to provide performance data.
 void ConsensusManagerPBFT::SetupPerformanceDataFunc(
     std::function<std::string()> func) {
   performance_manager_->SetDataFunc(func);
 }
 
+// Set a function for pre-verification of requests.
 void ConsensusManagerPBFT::SetPreVerifyFunc(
     std::function<bool(const Request&)> func) {
   commitment_->SetPreVerifyFunc(func);

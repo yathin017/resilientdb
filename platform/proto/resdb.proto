@@ -127,10 +127,19 @@ message NewReplicaRequest {
   ReplicaInfo replica_info = 1;
 }
 
+// yathin017 - RemoveReplicaRequest
+message RemoveReplicaRequest {
+  int64 replica_info = 1;
+}
+
 message SystemInfoRequest {
   enum Type {
       NONE = 0;
       ADD_REPLICA = 1;
+
+      // yathin017 - REMOVE_REPLICA
+      REMOVE_REPLICA = 2;
+
   };
   Type type = 1;
   bytes request = 2;

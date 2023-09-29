@@ -32,17 +32,22 @@
 namespace resdb {
 
 std::mutex g_mutex;
+
+// Get the global Stats instance with a specified update frequency.
+// Uses lazy initialization to create a single instance.
 Stats* Stats::GetGlobalStats(int seconds) {
   std::unique_lock<std::mutex> lk(g_mutex);
   static Stats stats(seconds);
   return &stats;
 }
 
+// Constructor for the Stats class.
 Stats::Stats(int sleep_time) {
   monitor_sleep_time_ = sleep_time;
 #ifdef TEST_MODE
   monitor_sleep_time_ = 1;
 #endif
+  // Initialize various counters and flags.
   num_call_ = 0;
   num_commit_ = 0;
   run_time_ = 0;
@@ -66,12 +71,16 @@ Stats::Stats(int sleep_time) {
 
   prometheus_ = nullptr;
 
-  global_thread_ =
-      std::thread(&Stats::MonitorGlobal, this);  // pass by reference
+  // Start a thread to monitor and log statistics.
+  global_thread_ = std::thread(&Stats::MonitorGlobal, this);  // pass by reference
 }
 
-void Stats::Stop() { stop_ = true; }
+// Stop the monitoring thread.
+void Stats::Stop() {
+  stop_ = true;
+}
 
+// Destructor for the Stats class.
 Stats::~Stats() {
   stop_ = true;
   if (global_thread_.joinable()) {
@@ -79,6 +88,7 @@ Stats::~Stats() {
   }
 }
 
+// Monitor and log global statistics at regular intervals.
 void Stats::MonitorGlobal() {
   LOG(ERROR) << "monitor:" << name_ << " sleep time:" << monitor_sleep_time_;
 
@@ -91,13 +101,9 @@ void Stats::MonitorGlobal() {
   uint64_t server_call = 0, server_process = 0;
   uint64_t seq_gap = 0;
   uint64_t total_request = 0, total_geo_request = 0, geo_request = 0;
-
-  // ====== for client proxy ======
   uint64_t run_req_num = 0, run_req_run_time = 0;
 
   uint64_t last_run_req_num = 0, last_run_req_run_time = 0;
-  // =============================
-
   uint64_t last_seq_fail = 0;
   uint64_t last_num_client_req = 0, last_num_propose = 0, last_num_prepare = 0,
            last_num_commit = 0;
@@ -113,6 +119,8 @@ void Stats::MonitorGlobal() {
   while (!stop_) {
     sleep(monitor_sleep_time_);
     time += monitor_sleep_time_;
+    // Retrieve and log statistics.
+    // (Note: Logic to calculate differences between successive statistics counts.)
     seq_fail = seq_fail_;
     socket_recv = socket_recv_;
     client_call = client_call_;
@@ -218,6 +226,7 @@ void Stats::MonitorGlobal() {
   }
 }
 
+// Increment the client call counter and update Prometheus metrics.
 void Stats::IncClientCall() {
   if (prometheus_) {
     prometheus_->Inc(CLIENT_CALL, 1);
@@ -225,6 +234,7 @@ void Stats::IncClientCall() {
   client_call_++;
 }
 
+// Increment the client request counter and update Prometheus metrics.
 void Stats::IncClientRequest() {
   if (prometheus_) {
     prometheus_->Inc(CLIENT_REQ, 1);
@@ -232,6 +242,7 @@ void Stats::IncClientRequest() {
   num_client_req_++;
 }
 
+// Increment the propose counter and update Prometheus metrics.
 void Stats::IncPropose() {
   if (prometheus_) {
     prometheus_->Inc(PROPOSE, 1);
@@ -239,6 +250,7 @@ void Stats::IncPropose() {
   num_propose_++;
 }
 
+// Increment the prepare counter and update Prometheus metrics.
 void Stats::IncPrepare() {
   if (prometheus_) {
     prometheus_->Inc(PREPARE, 1);
@@ -246,6 +258,7 @@ void Stats::IncPrepare() {
   num_prepare_++;
 }
 
+// Increment the commit counter and update Prometheus metrics.
 void Stats::IncCommit() {
   if (prometheus_) {
     prometheus_->Inc(COMMIT, 1);
@@ -253,10 +266,17 @@ void Stats::IncCommit() {
   num_commit_++;
 }
 
-void Stats::IncPendingExecute() { pending_execute_++; }
+// Increment the pending execute counter.
+void Stats::IncPendingExecute() {
+  pending_execute_++;
+}
 
-void Stats::IncExecute() { execute_++; }
+// Increment the execute counter.
+void Stats::IncExecute() {
+  execute_++;
+}
 
+// Increment the execute done counter and update Prometheus metrics.
 void Stats::IncExecuteDone() {
   if (prometheus_) {
     prometheus_->Inc(EXECUTE, 1);
@@ -264,6 +284,7 @@ void Stats::IncExecuteDone() {
   execute_done_++;
 }
 
+// Increment the broadcast message counter and update Prometheus metrics.
 void Stats::BroadCastMsg() {
   if (prometheus_) {
     prometheus_->Inc(BROAD_CAST, 1);
@@ -271,12 +292,22 @@ void Stats::BroadCastMsg() {
   broad_cast_msg_++;
 }
 
-void Stats::SendBroadCastMsg(uint32_t num) { send_broad_cast_msg_ += num; }
+// Increment the send broadcast message counter.
+void Stats::SendBroadCastMsg(uint32_t num) {
+  send_broad_cast_msg_ += num;
+}
 
-void Stats::SendBroadCastMsgPerRep() { send_broad_cast_msg_per_rep_++; }
+// Increment the send broadcast message per replica counter.
+void Stats::SendBroadCastMsgPerRep() {
+  send_broad_cast_msg_per_rep_++;
+}
 
-void Stats::SeqFail() { seq_fail_++; }
+// Increment the sequence fail counter.
+void Stats::SeqFail() {
+  seq_fail_++;
+}
 
+// Increment the total request counter and update Prometheus metrics.
 void Stats::IncTotalRequest(uint32_t num) {
   if (prometheus_) {
     prometheus_->Inc(NUM_EXECUTE_TX, num);
@@ -284,10 +315,17 @@ void Stats::IncTotalRequest(uint32_t num) {
   total_request_ += num;
 }
 
-void Stats::IncTotalGeoRequest(uint32_t num) { total_geo_request_ += num; }
+// Increment the total geo request counter.
+void Stats::IncTotalGeoRequest(uint32_t num) {
+  total_geo_request_ += num;
+}
 
-void Stats::IncGeoRequest() { geo_request_++; }
+// Increment the geo request counter.
+void Stats::IncGeoRequest() {
+  geo_request_++;
+}
 
+// Increment the server call counter and update Prometheus metrics.
 void Stats::ServerCall() {
   if (prometheus_) {
     prometheus_->Inc(SERVER_CALL_NAME, 1);
@@ -295,6 +333,7 @@ void Stats::ServerCall() {
   server_call_++;
 }
 
+// Increment the server process counter and update Prometheus metrics.
 void Stats::ServerProcess() {
   if (prometheus_) {
     prometheus_->Inc(SERVER_PROCESS, 1);
@@ -302,13 +341,18 @@ void Stats::ServerProcess() {
   server_process_++;
 }
 
-void Stats::SeqGap(uint64_t seq_gap) { seq_gap_ = seq_gap; }
+// Update the sequence gap.
+void Stats::SeqGap(uint64_t seq_gap) {
+  seq_gap_ = seq_gap;
+}
 
+// Add latency data for client requests.
 void Stats::AddLatency(uint64_t run_time) {
   run_req_num_++;
   run_req_run_time_ += run_time;
 }
 
+// Set the Prometheus address for metrics export.
 void Stats::SetPrometheus(const std::string& prometheus_address) {
   prometheus_ = std::make_unique<PrometheusHandler>(prometheus_address);
 }

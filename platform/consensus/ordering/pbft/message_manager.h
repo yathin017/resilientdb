@@ -102,11 +102,15 @@ class MessageManager {
 
   Storage* GetStorage();
 
+  // yathin017 - AddReplica and RemoveReplica
+  void AddReplica(const ReplicaInfo& replica);
+  void RemoveReplica(int64_t replica_id);
+
   void SetLastCommittedTime(uint64_t proxy_id);
 
   uint64_t GetLastCommittedTime(uint64_t proxy_id);
 
-  bool IsPreapared(uint64_t seq);
+  bool IsPrepared(uint64_t seq);
 
   uint64_t GetHighestPreparedSeq();
 

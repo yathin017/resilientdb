@@ -30,40 +30,45 @@
 
 namespace resdb {
 
-Query::Query(const ResDBConfig& config, MessageManager* message_manager,
-             std::unique_ptr<CustomQuery> executor)
+// Constructor for the Query class
+Query::Query(const ResDBConfig& config, MessageManager* message_manager, std::unique_ptr<CustomQuery> executor)
     : config_(config),
       message_manager_(message_manager),
       custom_query_executor_(std::move(executor)) {}
 
+// Destructor for the Query class
 Query::~Query() {}
 
-int Query::ProcessGetReplicaState(std::unique_ptr<Context> context,
-                                  std::unique_ptr<Request> request) {
+// Process a request to get replica state
+int Query::ProcessGetReplicaState(std::unique_ptr<Context> context, std::unique_ptr<Request> request) {
   ReplicaState replica_state;
+  
+  // Get the replica state from the message manager
   int ret = message_manager_->GetReplicaState(&replica_state);
+  
   if (ret == 0) {
     if (context != nullptr && context->client != nullptr) {
+      // Send the replica state response to the client
       ret = context->client->SendRawMessage(replica_state);
       if (ret) {
-        LOG(ERROR) << "send resp" << replica_state.DebugString()
-                   << " fail ret:" << ret;
+        LOG(ERROR) << "send resp" << replica_state.DebugString() << " fail ret:" << ret;
       }
     }
   }
   return ret;
 }
 
-int Query::ProcessQuery(std::unique_ptr<Context> context,
-                        std::unique_ptr<Request> request) {
+// Process a general query request
+int Query::ProcessQuery(std::unique_ptr<Context> context, std::unique_ptr<Request> request) {
   QueryRequest query;
   if (!query.ParseFromString(request->data())) {
     LOG(ERROR) << "parse data fail";
     return -2;
   }
-  // LOG(ERROR) << "request:" << query.DebugString();
 
   QueryResponse response;
+  
+  // Iterate through the requested sequence numbers and add corresponding transactions to the response
   for (uint64_t i = query.min_seq(); i <= query.max_seq(); ++i) {
     Request* ret_request = message_manager_->GetRequest(i);
     if (ret_request == nullptr) {
@@ -77,7 +82,7 @@ int Query::ProcessQuery(std::unique_ptr<Context> context,
   }
 
   if (context != nullptr && context->client != nullptr) {
-    // LOG(ERROR) << "send response:" << response.DebugString();
+    // Send the query response to the client
     int ret = context->client->SendRawMessage(response);
     if (ret) {
       LOG(ERROR) << "send resp fail ret:" << ret;
@@ -86,15 +91,15 @@ int Query::ProcessQuery(std::unique_ptr<Context> context,
   return 0;
 }
 
-int Query::ProcessCustomQuery(std::unique_ptr<Context> context,
-                              std::unique_ptr<Request> request) {
+// Process a custom query request
+int Query::ProcessCustomQuery(std::unique_ptr<Context> context, std::unique_ptr<Request> request) {
   if (custom_query_executor_ == nullptr) {
     LOG(ERROR) << "no custom executor";
     return -1;
   }
 
-  std::unique_ptr<std::string> resp_str =
-      custom_query_executor_->Query(request->data());
+  // Execute the custom query and get the response string
+  std::unique_ptr<std::string> resp_str = custom_query_executor_->Query(request->data());
 
   CustomQueryResponse response;
   if (resp_str != nullptr) {
@@ -102,6 +107,7 @@ int Query::ProcessCustomQuery(std::unique_ptr<Context> context,
   }
 
   if (context != nullptr && context->client != nullptr) {
+    // Send the custom query response to the client
     int ret = context->client->SendRawMessage(response);
     if (ret) {
       LOG(ERROR) << "send resp fail ret:" << ret;
