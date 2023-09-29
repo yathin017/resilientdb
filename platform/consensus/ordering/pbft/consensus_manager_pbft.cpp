@@ -272,6 +272,11 @@ int ConsensusManagerPBFT::InternalConsensusCommit(
                                             std::move(request));
     case Request::TYPE_CUSTOM_QUERY:
       return query_->ProcessCustomQuery(std::move(context), std::move(request));
+    
+    // yathin017
+    case Request::TYPE_SYSTEM_INFO:
+      system_info_->ProcessRequest(std::move(request));
+      return 0;
   }
   return 0;
 }

@@ -101,18 +101,24 @@ void SystemInfo::RemoveReplica(int64_t replica_id) {
   }
 }
 
-void SystemInfo::ProcessRequest(const SystemInfoRequest& request) {
-  switch (request.type()) {
+// yathin017
+void SystemInfo::ProcessRequest(std::unique_ptr<Request> request) {
+  SystemInfoRequest request_sys;
+  request_sys.ParseFromString(request->data());
+
+  switch (request_sys.type()) {
     case SystemInfoRequest::ADD_REPLICA: {
       NewReplicaRequest info;
-      if (info.ParseFromString(request.request())) {
+      if (info.ParseFromString(request_sys.request())) {
         AddReplica(info.replica_info());
       }
     } break;
     case SystemInfoRequest::REMOVE_REPLICA: {
-      RemoveReplicaRequest removeInfo;
-      if (removeInfo.ParseFromString(request.request())) {
-        RemoveReplica(removeInfo.replica_info());
+      LOG(INFO) << "&&&&& Received LEAVE message from replica 4 &&&&&";
+
+      RemoveReplicaRequest info;
+      if (info.ParseFromString(request_sys.request())) {
+        RemoveReplica(info.replica_info());
       }
     } break;
     default:

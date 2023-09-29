@@ -46,7 +46,8 @@ class SystemInfo {
   // yathin017 - RemoveReplica
   void RemoveReplica(int64_t id);
 
-  void ProcessRequest(const SystemInfoRequest& request);
+  // void ProcessRequest(const SystemInfoRequest& request);
+  void ProcessRequest(std::unique_ptr<Request> request);
 
   uint32_t GetPrimaryId() const;
   void SetPrimary(uint32_t id);

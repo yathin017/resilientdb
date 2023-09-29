@@ -38,7 +38,10 @@ message Request {
         TYPE_NEWVIEW= 17;
         TYPE_CUSTOM_QUERY = 18;
 
-        NUM_OF_TYPE = 19; // the total number of types.
+        // yathin017
+        TYPE_SYSTEM_INFO = 19;
+
+        NUM_OF_TYPE = 20; // the total number of types.
                        // Used to create the collector.
     };
     int32 type = 1;

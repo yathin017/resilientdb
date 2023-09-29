@@ -281,7 +281,7 @@ uint64_t MessageManager::GetLastCommittedTime(uint64_t proxy_id) {
 }
 
 // Check if a sequence number is prepared
-// @y017 IsPreapared -> IsPrepared
+// yathin017 IsPreapared -> IsPrepared
 bool MessageManager::IsPrepared(uint64_t seq) {
   return collector_pool_->GetCollector(seq)->IsPrepared();
 }
