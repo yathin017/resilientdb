@@ -106,6 +106,10 @@ class MessageManager {
   void AddReplica(const ReplicaInfo& replica);
   void RemoveReplica(int64_t replica_id);
 
+  // yathin017 - GetReplicaCount and GetMinDataReceiveNum
+  int GetReplicaCount();
+  int GetMinDataReceiveNum();
+
   void SetLastCommittedTime(uint64_t proxy_id);
 
   uint64_t GetLastCommittedTime(uint64_t proxy_id);

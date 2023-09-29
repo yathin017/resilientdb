@@ -123,9 +123,17 @@ std::vector<ReplicaInfo> MessageManager::GetReplicas() {
 // yathin017 - MessageManager::AddReplica and MessageManager::RemoveReplica
 void MessageManager::AddReplica(const ReplicaInfo& replica) {
   return system_info_->AddReplica(replica);
-}
+};
 void MessageManager::RemoveReplica(int64_t replica_id) {
   return system_info_->RemoveReplica(replica_id);
+};
+
+// yathin017 - MessageManager::GetReplicaCount and MessageManager::GetMinDataReceiveNum
+int MessageManager::GetReplicaCount() {
+  return  system_info_->GetReplicaCount();
+};
+int MessageManager::GetMinDataReceiveNum() {
+  return system_info_->GetMinDataReceiveNum();
 };
 
 // Check if the request is valid

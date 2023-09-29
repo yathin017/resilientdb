@@ -47,6 +47,16 @@ void SystemInfo::SetCurrentView(uint64_t view_id) { view_ = view_id; }
 
 std::vector<ReplicaInfo> SystemInfo::GetReplicas() const { return replicas_; }
 
+// yathin017
+int SystemInfo::GetReplicaCount() const { return replicas_.size(); };
+
+// yathin017
+int SystemInfo::GetMinDataReceiveNum() const {
+  int f = (replicas_.size() - 1) / 3;
+  // return std::max(2 * f + 1, 1);
+  return f;
+}
+
 void SystemInfo::SetReplicas(const std::vector<ReplicaInfo>& replicas) {
   replicas_ = replicas;
 }
@@ -69,10 +79,13 @@ void SystemInfo::AddReplica(const ReplicaInfo& replica) {
       return;
     }
   }
+
+
   LOG(ERROR) << "Adding new replica \n" << replica.DebugString();
   replicas_.push_back(replica);
 
   LOG(INFO) << "Existing replicas:\n";
+  LOG(INFO) << "replicas_ size:" << replicas_.size() << '\n';
   for (const auto& cur_replica : replicas_) {
     LOG(INFO) << "Replica ID:" << cur_replica.id() << " IP: " << cur_replica.ip();
   }
@@ -90,7 +103,7 @@ void SystemInfo::RemoveReplica(int64_t replica_id) {
 
   if (it != replicas_.end()) {
     replicas_.erase(it, replicas_.end());
-    LOG(ERROR) << "Removed replica with ID: " << replica_id;
+    LOG(INFO) << "Removed replica with ID: " << replica_id;
   } else {
     LOG(ERROR) << "Replica with ID " << replica_id << " not found.";
   }

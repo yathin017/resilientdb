@@ -43,8 +43,15 @@ class SystemInfo {
   std::vector<ReplicaInfo> GetReplicas() const;
   void SetReplicas(const std::vector<ReplicaInfo>& replicas);
   void AddReplica(const ReplicaInfo& replica);
+  
   // yathin017 - RemoveReplica
   void RemoveReplica(int64_t id);
+
+  // yathin017 - GetReplicaCount
+  int GetReplicaCount() const;
+
+  // yathin017 - GetMinDataReceiveNum
+  int GetMinDataReceiveNum() const;
 
   // void ProcessRequest(const SystemInfoRequest& request);
   void ProcessRequest(std::unique_ptr<Request> request);

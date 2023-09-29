@@ -182,22 +182,26 @@ int Commitment::ProcessProposeMsg(std::unique_ptr<Context> context,
     }
     */
 
-  // yathin017 - TEST: Broadcasting leave request
+// yathin017 - TEST: Broadcasting leave request
 //   LOG(INFO) << "################################### Replica 5 Broadcasting LEAVE Request ###################################";
+
 //   if (config_.GetSelfInfo().id() == 5) {
-//   std::unique_ptr<SystemInfoRequest> system_info_request =
-//       std::make_unique<SystemInfoRequest>();
-//   system_info_request->set_type(SystemInfoRequest::REMOVE_REPLICA);
-//   system_info_request->set_request("5"); // Assuming you use "5" as the replica ID to leave.
+//   // Create a SystemInfoRequest message for removing a replica
+//   std::unique_ptr<SystemInfoRequest> remove_replica_request = std::make_unique<SystemInfoRequest>();
+//   remove_replica_request->set_type(SystemInfoRequest::REMOVE_REPLICA);
+//   remove_replica_request->set_request("5"); // Assuming "5" as the replica ID to leave.
 
-//   std::string request_data;
-//   system_info_request->SerializeToString(&request_data);
+//   // Serialize the SystemInfoRequest to a string
+//   std::string remove_replica_request_data;
+//   remove_replica_request->SerializeToString(&remove_replica_request_data);
 
-//   std::unique_ptr<Request> leave_system_request = std::make_unique<Request>();
-//   leave_system_request->set_type(Request::TYPE_SYSTEM_INFO);
-//   leave_system_request->set_data(request_data);
+//   // Create a Request message for broadcasting the leave system info
+//   std::unique_ptr<Request> leave_system_info_request = std::make_unique<Request>();
+//   leave_system_info_request->set_type(Request::TYPE_SYSTEM_INFO);
+//   leave_system_info_request->set_data(remove_replica_request_data);
 
-//   replica_communicator_->BroadCast(*leave_system_request);
+//   // Broadcast the leave system info request
+//   replica_communicator_->BroadCast(*leave_system_info_request);
 // }
 
   if (request->sender_id() != config_.GetSelfInfo().id()) {
@@ -225,6 +229,9 @@ int Commitment::ProcessProposeMsg(std::unique_ptr<Context> context,
     }
   }
 
+  BatchUserRequest batch_request;
+  batch_request.ParseFromString(request->data());
+
   global_stats_->IncPropose();
   std::unique_ptr<Request> prepare_request = resdb::NewRequest(
       Request::TYPE_PREPARE, *request, config_.GetSelfInfo().id());
@@ -239,38 +246,47 @@ int Commitment::ProcessProposeMsg(std::unique_ptr<Context> context,
 
   // yathin017 - TEST: Add and Remove replica
 
-  BatchUserRequest batch_request;
-  batch_request.ParseFromString(request->data());
-
-  // LOG(INFO) << "################################### Replica " << config_.GetSelfInfo().id() 
-  //           << " added consensus message with batch user request seq "
-  //           << batch_request.seq()
-  //           << " ------> STATE: " << ret << " ###################################";
-  // if (config_.GetSelfInfo().id() == 2) {
+  LOG(INFO) << "################################### Replica " << config_.GetSelfInfo().id() 
+            << " added consensus message with batch user request seq "
+            << batch_request.seq()
+            << " ------> STATE: " << ret << " ###################################";
+  if (config_.GetSelfInfo().id() == 2) {
     
-  //   std::vector<ReplicaInfo> replicas;
-  //   int n;
-  //   int f;
+    std::vector<ReplicaInfo> replicas;
+    int n;
+    int f;
 
-  //   ReplicaInfo new_replica;
-  //   int64_t repID = 5;
-  //   std::string repIP = "128.110.218.52";
+    ReplicaInfo new_replica;
+    int64_t repID = 5;
+    std::string repIP = "128.110.218.52";
 
-  //   new_replica.set_id(repID);
-  //   new_replica.set_ip(repIP);
+    new_replica.set_id(repID);
+    new_replica.set_ip(repIP);
 
-  //   // ADD REPLICA
-  //   message_manager_->AddReplica(new_replica);
-  //   n = config_.GetReplicaNum();
-  //   f = n - config_.GetMinDataReceiveNum();
-  //   LOG(INFO) << "n: " << n << ", f: " << f;
 
-  //   // REMOVE REPLICA
-  //   message_manager_->RemoveReplica(repID);
-  //   n = config_.GetReplicaNum();
-  //   f = n - config_.GetMinDataReceiveNum();
-  //   LOG(INFO) << "n: " << n << ", f: " << f;
-  // }
+    LOG(INFO) << "BEFORE ADD";
+    // n = config_.GetReplicaNum();
+    n = message_manager_->GetReplicaCount();
+
+    // f = n - config_.GetMinDataReceiveNum();
+    f = n - message_manager_->GetMinDataReceiveNum();
+    LOG(INFO) << "n: " << n << ", f: " << f;
+
+    // ADD REPLICA
+    message_manager_->AddReplica(new_replica);
+    
+    LOG(INFO) << "AFTER ADD";
+    // n = config_.GetReplicaNum();
+    n = message_manager_->GetReplicaCount();
+    f = n - config_.GetMinDataReceiveNum();
+    LOG(INFO) << "n: " << n << ", f: " << f;
+
+    // // REMOVE REPLICA
+    // message_manager_->RemoveReplica(repID);
+    // n = config_.GetReplicaNum();
+    // f = n - config_.GetMinDataReceiveNum();
+    // LOG(INFO) << "n: " << n << ", f: " << f;
+  }
 
   if (ret == CollectorResultCode::STATE_CHANGED) {
     replica_communicator_->BroadCast(*prepare_request);
