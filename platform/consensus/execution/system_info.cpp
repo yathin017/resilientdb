@@ -114,8 +114,7 @@ void SystemInfo::ProcessRequest(std::unique_ptr<Request> request) {
       }
     } break;
     case SystemInfoRequest::REMOVE_REPLICA: {
-      LOG(INFO) << "&&&&& Received LEAVE message from replica 4 &&&&&";
-
+      LOG(INFO) << "################################### Received LEAVE message from Replica 5 ###################################";
       RemoveReplicaRequest info;
       if (info.ParseFromString(request_sys.request())) {
         RemoveReplica(info.replica_info());
