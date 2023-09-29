@@ -276,17 +276,17 @@ int Commitment::ProcessProposeMsg(std::unique_ptr<Context> context,
     LOG(INFO) << "n = " << n << ", f = " << f;
     // LOG(INFO);
 
-    // REMOVE
-    message_manager_->RemoveReplica(rid);
-    // replicas = message_manager_->GetReplicas();
+    // // REMOVE
+    // message_manager_->RemoveReplica(rid);
+    // // replicas = message_manager_->GetReplicas();
 
-    // LOG(INFO) << "existing replicas: ";
-    // for (const auto& cur_replica : replicas) {
-    //   LOG(INFO) << "replica " << cur_replica.id();
-    // }
-    n = config_.GetReplicaNum();
-    f = n - config_.GetMinDataReceiveNum();
-    LOG(INFO) << "n = " << n << ", f = " << f;
+    // // LOG(INFO) << "existing replicas: ";
+    // // for (const auto& cur_replica : replicas) {
+    // //   LOG(INFO) << "replica " << cur_replica.id();
+    // // }
+    // n = config_.GetReplicaNum();
+    // f = n - config_.GetMinDataReceiveNum();
+    // LOG(INFO) << "n = " << n << ", f = " << f;
   }
 
   if (ret == CollectorResultCode::STATE_CHANGED) {
